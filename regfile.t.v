@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// Test harness validates hw4testbench by connecting it to various functional 
+// Test harness validates hw4testbench by connecting it to various functional
 // or broken register files, and verifying that it correctly identifies each
 //------------------------------------------------------------------------------
 
@@ -17,7 +17,7 @@ module hw4testbenchharness();
   wire		Clk;		// Clock (Positive Edge Triggered)
 
   reg		begintest;	// Set High to begin testing register file
-  wire  	endtest;    	// Set High to signal test completion 
+  wire  	endtest;    	// Set High to signal test completion
   wire		dutpassed;	// Indicates whether register file passed tests
 
   // Instantiate the register file being tested.  DUT = Device Under Test
@@ -37,15 +37,15 @@ module hw4testbenchharness();
   hw4testbench tester
   (
     .begintest(begintest),
-    .endtest(endtest), 
+    .endtest(endtest),
     .dutpassed(dutpassed),
     .ReadData1(ReadData1),
     .ReadData2(ReadData2),
-    .WriteData(WriteData), 
-    .ReadRegister1(ReadRegister1), 
+    .WriteData(WriteData),
+    .ReadRegister1(ReadRegister1),
     .ReadRegister2(ReadRegister2),
     .WriteRegister(WriteRegister),
-    .RegWrite(RegWrite), 
+    .RegWrite(RegWrite),
     .Clk(Clk)
   );
 
@@ -104,15 +104,16 @@ output reg		Clk
     Clk=0;
   end
 
+  integer i;
+
   // Once 'begintest' is asserted, start running test cases
   always @(posedge begintest) begin
     endtest = 0;
     dutpassed = 1;
     #10
 
-  // Test Case 1: 
+  // Test Case 1:
   //   Write '42' to register 2, verify with Read Ports 1 and 2
-  //   (Passes because example register file is hardwired to return 42)
   WriteRegister = 5'd2;
   WriteData = 32'd42;
   RegWrite = 1;
@@ -126,9 +127,8 @@ output reg		Clk
     $display("Test Case 1 Failed");
   end
 
-  // Test Case 2: 
+  // Test Case 2:
   //   Write '15' to register 2, verify with Read Ports 1 and 2
-  //   (Fails with example register file, but should pass with yours)
   WriteRegister = 5'd2;
   WriteData = 32'd15;
   RegWrite = 1;
@@ -141,6 +141,74 @@ output reg		Clk
     $display("Test Case 2 Failed");
   end
 
+  // Test Case 3:
+  //   Tests: Write Enable is broken / ignored – Register is always written to.
+  //   Set RegWrite to '0' and "write" '37' to register 5
+  //   Verify with Read Ports 1 and 2 that register 5 is empty
+  WriteRegister = 5'd5;
+  WriteData = 32'd37;
+  RegWrite = 0;
+  ReadRegister1 = 5'd5;
+  ReadRegister2 = 5'd5;
+  #5 Clk=1; #5 Clk=0;
+
+  if((ReadData1 !== 'bx) || (ReadData2 !== 'bx)) begin
+    dutpassed = 0;
+    $display("Test Case 3 Failed");
+  end
+
+  // Test Case 4:
+  //   Tests: Decoder is broken – All registers are written to.
+  //   Write '26' to register 2
+  //   Verify that register 2 is '26' and register 31 is empty
+  WriteRegister = 5'd2;
+  WriteData = 32'd26;
+  RegWrite = 1;
+  ReadRegister1 = 5'd2;
+  ReadRegister2 = 5'd31;
+  #5 Clk=1; #5 Clk=0;
+
+  if((ReadData1 !== 26) || (ReadData2 !== 'bx)) begin
+    dutpassed = 0;
+    $display("Test Case 4 Failed");
+  end
+
+  // Test Case 5:
+  //   Tests: Register Zero is actually a register instead of the constant value zero.
+  //   Write '89' to register 0
+  //   Verify with Read Ports 1 and 2 that register 0 is still '0'
+  WriteRegister = 5'd0;
+  WriteData = 32'd89;
+  RegWrite = 1;
+  ReadRegister1 = 5'd0;
+  ReadRegister2 = 5'd0;
+  #5 Clk=1; #5 Clk=0;
+
+  if((ReadData1 !== 0) || (ReadData2 !== 0)) begin
+    dutpassed = 0;
+    $display("Test Case 5 Failed");
+  end
+
+  // Test Case 6:
+  //   Tests: Port 2 is broken and always reads register 14 (for example).
+  //   Write 'i' to register i, where i is an integer from 0 to 31
+  //   Verify with Read Ports 1 and 2 that register i is 'i'
+  for (i = 32'd0; i < 32'd32; i = i + 32'd1) begin
+    WriteRegister = i;
+    WriteData = i;
+    RegWrite = 1;
+    #5 Clk=1; #5 Clk=0;
+  end
+
+  for (i = 32'd0; i < 32'd32; i = i + 32'd1) begin
+    ReadRegister1 = i;
+    ReadRegister2 = i;
+    #5 Clk=1; #5 Clk=0;
+    if((ReadData1 !== i) || (ReadData2 !== i)) begin
+      dutpassed = 0;
+      $display("Test Case 6 Failed");
+    end
+  end
 
   // All done!  Wait a moment and signal test completion.
   #5
